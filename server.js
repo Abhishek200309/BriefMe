@@ -17,7 +17,7 @@ const https    = require('https');
 
 // ── CONFIGURATION ─────────────────────────────────────────────────
 //  Paste your Groq API key here (get it free at console.groq.com)
-const GROQ_API_KEY = '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';  // starts with gsk_
+const GROQ_API_KEY = 'gsk_your_actual_key_here';  // starts with gsk_
 const MODEL        = 'llama-3.3-70b-versatile';
 const PORT         = 3000;
 
