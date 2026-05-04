@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Document Intelligence</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet"/>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f9f7f4; --surface: #fff; --surface2: #f3f1ed;
+      --border: #e0dbd4; --border2: #cdc8c0;
+      --text: #1a1916; --text2: #6b6760; --text3: #9e9b96;
+      --info-bg: #eef4ff; --info-text: #1d4ed8;
+      --success-bg: #effdf4; --success-text: #166534;
+      --danger-bg: #fff1f1; --danger-text: #b91c1c;
+      --accent: #f97316;
+    }
+
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; justify-content: center; padding: 2rem 1rem 4rem; }
+    #app { width: 100%; max-width: 700px; }
+
+    /* Header */
+    .header { margin-bottom: 2rem; }
+    h1 { font-family: 'Lora', serif; font-size: 26px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 4px; }
+    .subtitle { font-size: 14px; color: var(--text2); margin-bottom: 1rem; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Status banner */
+    .status-banner {
+      padding: 10px 14px; border-radius: 10px; font-size: 13px;
+      margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px;
+    }
+    .status-banner.ok  { background: var(--success-bg); color: var(--success-text); border: 1px solid #bbf7d0; }
+    .status-banner.err { background: var(--danger-bg);  color: var(--danger-text);  border: 1px solid #fecaca; }
+    .status-banner.checking { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+
+    /* Upload */
+    .upload-zone {
+      border: 1.5px dashed var(--border2); border-radius: 14px;
+      padding: 2.25rem 2rem; text-align: center; cursor: pointer;
+      transition: border-color .15s, background .15s;
+      background: var(--surface); position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: var(--surface2); }
+    .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .upload-icon { width: 48px; height: 48px; margin: 0 auto 14px; background: var(--info-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .upload-zone h3 { font-size: 15px; font-weight: 500; margin-bottom: 5px; }
+    .upload-zone p  { font-size: 13px; color: var(--text3); }
+
+    /* Progress */
+    .status-bar { display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text3); margin: 10px 0; }
+    .spinner { width: 12px; height: 12px; border: 1.5px solid var(--border2); border-top-color: var(--text2); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-bar-wrap { background: var(--border); border-radius: 4px; height: 4px; margin-top: 6px; overflow: hidden; }
+    .progress-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
+
+    /* Error */
+    .error-msg { background: var(--danger-bg); color: var(--danger-text); border: 1px solid #fecaca; border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-top: 12px; line-height: 1.6; }
+    .error-msg strong { display: block; margin-bottom: 4px; }
+
+    /* File badge */
+    .file-badge { display: inline-flex; align-items: center; gap: 8px; background: var(--success-bg); color: var(--success-text); border-radius: 8px; padding: 7px 14px; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+    .new-doc-btn { font-size: 12px; color: var(--text2); background: none; border: none; cursor: pointer; padding: 2px 0; text-decoration: underline; text-underline-offset: 2px; display: block; margin-bottom: 14px; }
+
+    /* Summary */
+    .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.3rem 1.5rem; margin-top: 1rem; }
+    .section-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+    .summary-para { font-family: 'Lora', serif; font-size: 15px; line-height: 1.85; color: var(--text); }
+
+    .divider { height: 1px; background: var(--border); margin: 1.25rem 0; }
+
+    /* Chat */
+    .messages { display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; margin-bottom: 12px; }
+    .msg { padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.65; max-width: 88%; }
+    .msg.user      { background: var(--info-bg);   color: var(--info-text);  align-self: flex-end;  border-bottom-right-radius: 3px; }
+    .msg.assistant { background: var(--surface2);  color: var(--text);       align-self: flex-start; border-bottom-left-radius: 3px; font-family: 'Lora', serif; max-width: 96%; }
+    .msg.thinking  { background: var(--surface2);  color: var(--text3);      align-self: flex-start; font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 8px 14px; display: flex; gap: 4px; align-items: center; }
+    .dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--text3); animation: bounce 1s infinite; }
+    .dot:nth-child(2) { animation-delay: .15s; }
+    .dot:nth-child(3) { animation-delay: .3s; }
+    @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
+
+    .input-row { display: flex; gap: 8px; align-items: flex-end; }
+    .input-row textarea { flex: 1; border: 1px solid var(--border2); border-radius: 10px; padding: 10px 13px; font-family: 'Inter', sans-serif; font-size: 14px; color: var(--text); background: var(--surface); resize: none; min-height: 44px; max-height: 130px; line-height: 1.5; outline: none; }
+    .input-row textarea:focus { border-color: var(--accent); }
+    .send-btn { height: 44px; padding: 0 18px; border: none; border-radius: 10px; background: var(--accent); color: #fff; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .12s; flex-shrink: 0; }
+    .send-btn:hover:not(:disabled) { background: #ea580c; }
+    .send-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    .suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip { font-size: 12px; padding: 5px 11px; border: 1px solid var(--border2); border-radius: 20px; background: var(--surface); color: var(--text2); cursor: pointer; font-family: 'Inter', sans-serif; transition: background .12s; }
+    .chip:hover { background: var(--surface2); color: var(--text); }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <h1>Document Intelligence</h1>
+    <p class="subtitle">Upload a PDF or Word doc — get a ~100 word summary and ask questions.</p>
+    <div class="badge">⚡ Powered by Groq · Llama 3.3 70B</div>
+  </div>
+  <div id="root"></div>
+</div>
+
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  // ── State ──────────────────────────────────────
+  let state = {
+    serverOk: null,       // null = checking, true = ok, false = error
+    serverMsg: '',
+    phase: 'upload',
+    fileName: '', fileType: '', extractedText: '',
+    summary: '', messages: [], chatHistory: [],
+    loading: false, error: '', chatInput: '', pdfProgress: 0,
+  };
+
+  const root = document.getElementById('root');
+
+  // ── Check server on load ───────────────────────
+  async function checkServer() {
+    try {
+      const res  = await fetch('/api/status');
+      const data = await res.json();
+      state.serverOk  = data.ok;
+      state.serverMsg = data.message;
+    } catch {
+      state.serverOk  = false;
+      state.serverMsg = 'Cannot reach server. Is node server.js running?';
+    }
+    render();
+  }
+
+  // ── Render ─────────────────────────────────────
+  function render() {
+    root.innerHTML = renderBanner() + (state.phase === 'upload' ? renderUpload() : renderReady());
+    attachEvents();
+  }
+
+  function renderBanner() {
+    if (state.serverOk === null)
+      return `<div class="status-banner checking"><div class="spinner"></div> Connecting to server…</div>`;
+    if (!state.serverOk)
+      return `<div class="status-banner err">⚠️ ${esc(state.serverMsg)}</div>`;
+    return `<div class="status-banner ok">✅ ${esc(state.serverMsg)} — ready to go!</div>`;
+  }
+
+  function renderUpload() {
+    const locked = !state.serverOk;
+    return `
+      <div class="upload-zone" id="dropzone" style="${locked ? 'opacity:.4;pointer-events:none' : ''}">
+        <input type="file" id="fileInput" accept=".pdf,.doc,.docx" ${locked ? 'disabled' : ''}/>
+        <div class="upload-icon">📄</div>
+        <h3>${locked ? 'Fix the server issue above first' : 'Drop your document here, or click to browse'}</h3>
+        <p>PDF, DOC, DOCX — any size</p>
+      </div>
+      ${state.error ? `<div class="error-msg"><strong>❌ Error</strong>${esc(state.error)}</div>` : ''}
+      ${state.loading ? `
+        <div class="status-bar">
+          <div class="spinner"></div>
+          ${state.pdfProgress > 0 ? `Reading PDF… ${state.pdfProgress}%` : 'Reading document…'}
+        </div>
+        ${state.pdfProgress > 0 ? `<div class="progress-bar-wrap"><div class="progress-bar" style="width:${state.pdfProgress}%"></div></div>` : ''}
+      ` : ''}`;
+  }
+
+  function renderReady() {
+    const msgsHTML = state.messages.map(m => {
+      if (m.role === 'thinking')
+        return `<div class="msg thinking"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
+      return `<div class="msg ${m.role}">${esc(m.content)}</div>`;
+    }).join('');
+
+    const chips = ['What is the main conclusion?','Who are the key people or authors?','What are the key findings?','What problem does this document solve?'];
+
+    return `
+      <div class="file-badge">✓ ${esc(state.fileName)}</div>
+      <button class="new-doc-btn" id="newDoc">Upload a different document</button>
+
+      ${state.loading && !state.summary ? `<div class="status-bar"><div class="spinner"></div> Sending to Groq…</div>` : ''}
+      ${state.error ? `<div class="error-msg"><strong>❌ Error</strong>${esc(state.error)}</div>` : ''}
+
+      ${state.summary ? `
+        <div class="summary-card">
+          <div class="section-label">Summary (~100 words)</div>
+          <p class="summary-para">${esc(state.summary)}</p>
+        </div>
+        <div class="divider"></div>
+        <div class="section-label">Ask anything about this document</div>
+        ${state.messages.length === 0
+          ? `<div class="suggestions">${chips.map(q => `<button class="chip" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`
+          : ''}
+        <div class="messages" id="msgList">${msgsHTML}</div>
+        <div class="input-row">
+          <textarea id="chatInput" placeholder="Type your question and press Enter…" rows="1">${esc(state.chatInput)}</textarea>
+          <button class="send-btn" id="sendBtn" ${state.loading ? 'disabled' : ''}>Ask →</button>
+        </div>
+      ` : ''}`;
+  }
+
+  // ── Events ─────────────────────────────────────
+  function attachEvents() {
+    const fi = document.getElementById('fileInput');
+    if (fi) fi.onchange = e => { if (e.target.files[0]) processFile(e.target.files[0]); };
+
+    const dz = document.getElementById('dropzone');
+    if (dz) {
+      dz.ondragover  = e => { e.preventDefault(); dz.classList.add('drag-over'); };
+      dz.ondragleave = ()  => dz.classList.remove('drag-over');
+      dz.ondrop = e => { e.preventDefault(); dz.classList.remove('drag-over'); if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); };
+    }
+
+    const nd = document.getElementById('newDoc');
+    if (nd) nd.onclick = resetState;
+
+    const ml = document.getElementById('msgList');
+    if (ml) ml.scrollTop = ml.scrollHeight;
+
+    document.querySelectorAll('.chip').forEach(c => {
+      c.onclick = () => { state.chatInput = c.dataset.q; sendChat(); };
+    });
+
+    const ta = document.getElementById('chatInput');
+    if (ta) {
+      ta.oninput  = () => { state.chatInput = ta.value; ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+      ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } };
+    }
+
+    const sb = document.getElementById('sendBtn');
+    if (sb) sb.onclick = sendChat;
+  }
+
+  // ── File Processing ────────────────────────────
+  async function processFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['pdf','doc','docx'].includes(ext)) {
+      state.error = 'Please upload a PDF, DOC, or DOCX file.'; render(); return;
+    }
+    state.loading = true; state.error = ''; state.pdfProgress = 0; render();
+    try {
+      state.fileName = file.name; state.fileType = ext;
+      if (ext === 'pdf') {
+        state.extractedText = await extractPdfText(file);
+      } else {
+        const ab = await file.arrayBuffer();
+        state.extractedText = (await mammoth.extractRawText({ arrayBuffer: ab })).value;
+      }
+      if (!state.extractedText.trim()) throw new Error('No readable text found. The file may be a scanned image — try a text-based PDF or DOCX.');
+      state.phase = 'ready'; state.loading = false; render();
+      generateSummary();
+    } catch (err) {
+      state.loading = false; state.error = err.message; render();
+    }
+  }
+
+  async function extractPdfText(file) {
+    const buffer = await file.arrayBuffer();
+    const pdf    = await pdfjsLib.getDocument({ data: buffer }).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page    = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(item => item.str).join(' ') + '\n\n';
+      state.pdfProgress = Math.round((i / pdf.numPages) * 100);
+      render();
+    }
+    return text;
+  }
+
+  // ── Summary ────────────────────────────────────
+  async function generateSummary() {
+    state.loading = true; state.error = ''; render();
+    const userMsg = `Here is the full document:\n\n${state.extractedText}\n\nWrite a clear, fluent summary of this document in approximately 100 words. Cover the main topic, key arguments or findings, and the overall conclusion. Return ONLY the summary paragraph — no title, no bullet points, no preamble.`;
+    try {
+      const reply = await apiChat([{ role: 'user', content: userMsg }]);
+      state.summary = reply.trim();
+      state.chatHistory = [
+        { role: 'user',      content: userMsg },
+        { role: 'assistant', content: reply.trim() },
+      ];
+      state.loading = false; render();
+    } catch (err) {
+      state.loading = false; state.error = err.message; render();
+    }
+  }
+
+  // ── Chat ───────────────────────────────────────
+  async function sendChat() {
+    const q = state.chatInput.trim();
+    if (!q || state.loading) return;
+    state.messages.push({ role: 'user', content: q });
+    state.messages.push({ role: 'thinking', content: '' });
+    state.chatInput = ''; state.loading = true; state.error = ''; render();
+    const fullQ = `Answer based strictly on the document. If the answer isn't in the document, say so.\nQuestion: ${q}`;
+    try {
+      const history = [...state.chatHistory, { role: 'user', content: fullQ }];
+      const reply   = await apiChat(history);
+      state.messages = state.messages.filter(m => m.role !== 'thinking');
+      state.messages.push({ role: 'assistant', content: reply });
+      state.chatHistory.push({ role: 'user',      content: fullQ });
+      state.chatHistory.push({ role: 'assistant', content: reply });
+      state.loading = false; render();
+    } catch (err) {
+      state.messages = state.messages.filter(m => m.role !== 'thinking');
+      state.loading = false; state.error = err.message; render();
+    }
+  }
+
+  // ── API helper — calls our local server ────────
+  async function apiChat(messages) {
+    const res  = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || `Server error ${res.status}`);
+    return data.reply;
+  }
+
+  // ── Utils ──────────────────────────────────────
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function resetState() {
+    state = { ...state, phase: 'upload', fileName: '', fileType: '', extractedText: '', summary: '', messages: [], chatHistory: [], loading: false, error: '', chatInput: '', pdfProgress: 0 };
+    render();
+  }
+
+  // Boot
+  checkServer();
+</script>
+</body>
+</html>
